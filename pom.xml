@@ -15,7 +15,6 @@
     <modules>
         <module>deployment</module>
         <module>runtime</module>
-        <module>bom</module>
     </modules>
 
     <scm>

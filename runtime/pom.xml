@@ -10,6 +10,56 @@
     <artifactId>quarkus-chicory</artifactId>
     <name>Quarkus Chicory - Runtime</name>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.quarkiverse</groupId>
+                <artifactId>quarkus-chicory</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!--
+            quarkus-chicory-bom excludes chicory ASM dependencies
+            in order to remove the need for the application developer to define them
+            and override the version to align with those defined by Quarkus itself.
+            Having the Quarkus-aligned ASM dependencies in is required when using chicory
+            runtime compilation.
+            -->
+            <dependency>
+                <groupId>com.dylibso.chicory</groupId>
+                <artifactId>bom</artifactId>
+                <version>${dylibso.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-analysis</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-commons</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-tree</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-util</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>io.quarkus</groupId>
