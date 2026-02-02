@@ -1,0 +1,215 @@
+= Quarkus Chicory - An extension to easily integrate https://github.com/dylibso/chicory[Chicory] in your Quarkus applications
+
+include::./includes/attributes.adoc[]
+
+== Overview
+
+Quarkus Chicory integrates the https://github.com/dylibso/chicory[Chicory] WebAssembly runtime into Quarkus
+applications, providing a seamless way to execute WebAssembly modules within your Java applications. The extension
+abstracts away the complexity of WASM module management, compilation strategies, and execution modes through a simple
+injectable API.
+
+== Core Features
+
+=== WasmQuarkusContext - The Central API
+
+The `WasmQuarkusContext` is the primary interface between your application and WebAssembly modules. It provides
+environment-aware access to WASM modules through CDI injection:
+
+[source,java]
+----
+@Inject
+@Named("my-module")
+WasmQuarkusContext wasmContext;
+----
+
+**What it provides:**
+
+* **`MachineFactory`** - The execution engine configured for your environment:
+** In dev mode: configured for runtime compilation to enable hot reload
+** In production: optimized for build-time compilation
+** In native image: configured for native execution
+
+* **`WasmModule`** - The parsed WebAssembly module:
+** Loaded from configuration (file path or classpath resource)
+** Cached and reused across requests
+** Automatically reloaded in dev mode when source changes
+
+**Environment-aware behavior:**
+
+The `WasmQuarkusContext` automatically adapts based on:
+
+* **Quarkus execution mode** (dev, test, production, native)
+* **Module configuration** (static vs dynamic)
+* **Performance settings** (interpreter, runtime compiler, build-time compiler)
+
+This means you write your code once, and the extension optimizes execution for each environment:
+
+[source,java]
+----
+@PostConstruct
+public void init() {
+    // Same code works in dev, production, and native image
+    // Extension provides the right MachineFactory for each
+    Instance instance = Instance.builder(wasmContext.getWasmModule())
+        .withMachineFactory(wasmContext.getMachineFactory())
+        .build();
+}
+----
+
+=== Build-Time Code Generation
+
+The extension generates Java bytecode from your WebAssembly modules at build time:
+
+- **Replaces Chicory Maven plugin** - no separate plugin needed
+- **Type-safe access** to exported functions through generated classes
+- **Optimized performance** through build-time compilation
+- **Better IDE integration** with code completion and type checking
+
+Generated code is automatically available in the build output.
+
+=== Dependency Management
+
+Automatically handles version alignment between Quarkus and Chicory's ASM dependencies:
+
+- **No dependency conflicts** - transparent version management
+- **Just add the extension** - no manual dependency configuration
+- **Automatic updates** when upgrading Quarkus or the extension
+
+=== Multi WASM Module Support
+
+Configure and manage multiple WebAssembly modules, each with its own `WasmQuarkusContext`:
+
+[source,properties]
+----
+quarkus.chicory.modules.module-a.wasm-file=module-a.wasm
+quarkus.chicory.modules.module-b.wasm-file=module-b.wasm
+----
+
+[source,java]
+----
+@Inject @Named("module-a") WasmQuarkusContext moduleA;
+@Inject @Named("module-b") WasmQuarkusContext moduleB;
+----
+
+Each module is independently configured with its own `MachineFactory` and `WasmModule`.
+
+=== Static and Dynamic Module Loading
+
+==== Static Configuration
+
+Modules configured through `application.properties` with `WasmQuarkusContext` provided as injectable beans:
+
+[source,properties]
+----
+quarkus.chicory.modules.my-module.name=com.example.MyModule
+quarkus.chicory.modules.my-module.wasm-file=${project.basedir}/src/main/resources/my-module.wasm
+----
+
+**Benefits:**
+- `WasmQuarkusContext` injected automatically
+- `MachineFactory` optimized for build-time compilation
+- Automatic live reload in dev mode
+- Native image support
+
+==== Dynamic Loading
+
+For runtime-loaded modules, you can manually create instances using the appropriate `MachineFactory` from existing
+`WasmQuarkusContext` beans, or configure execution mode through properties.
+
+=== Intelligent Execution Mode Selection
+
+The extension configures the `MachineFactory` based on environment:
+
+==== Development Mode (`quarkus:dev`)
+
+- **MachineFactory**: Runtime compiler for hot reload
+- **WasmModule**: Reloaded automatically when files change
+- **Live reload**: Edit WASM → instant reload → test immediately
+
+==== Production Mode
+
+- **MachineFactory**: build-time compiler for optimal performance
+- **WasmModule**: Compiled at build time, cached
+- **Optimized execution**: Pre-compiled JVM bytecode
+
+==== Native Image Mode
+
+- **MachineFactory**: Native compilation
+- **WasmModule**: Embedded in native executable
+- **Fast startup**: No runtime compilation overhead
+
+
+=== Live Reload in Development
+
+Static modules automatically watched and reloaded:
+
+1. Edit WASM source code
+2. Rebuild to `.wasm` file
+3. Extension detects change
+4. New `WasmModule` loaded with runtime compiler `MachineFactory`
+5. Test immediately - no restart needed
+
+=== Native Image Compatibility
+
+Full GraalVM native image support with build-time WASM compilation through the extension's native-aware
+`MachineFactory`.
+
+== Note on Chicory Annotations
+
+The **quarkus-chicory extension does not currently expose Chicory's annotation processing capabilities**
+(`@HostModule`/`@WasmExport`) to users. The extension focuses on:
+
+- Injectable `WasmQuarkusContext` beans
+- Automatic code generation from WASM modules
+- Environment-optimized `MachineFactory` configuration
+
+If you want to use Chicory's `@HostModule`/`@WasmExport` annotations in a Quarkus application, you would need to
+manually add the Chicory annotation processor dependencies to your project.
+
+== Examples
+
+=== Basic Static Configuration
+
+include::./{examples-dir}/static-config-example.adoc[]
+
+=== Exported Functions - Calling WASM from Java
+
+include::./{examples-dir}/exported-functions-example.adoc[]
+
+=== Dynamic Module Loading
+
+include::./{examples-dir}/dynamic-loading-example.adoc[]
+
+=== Host Imports - Calling Java from WebAssembly
+
+include::./{examples-dir}/host-imports-example.adoc[]
+
+=== WASI Integration with Exported Functions
+
+include::./{examples-dir}/wasi-integration-example.adoc[]
+
+=== Memory Management - Passing Complex Data
+
+include::./{examples-dir}/memory-management-example.adoc[]
+
+== Installation
+
+If you want to use this extension, you need to add the `io.quarkiverse:quarkus-chicory` extension first to your build
+file.
+
+For instance, with Maven, add the following dependency to your POM file:
+
+[source,xml,subs=attributes+]
+----
+<dependency>
+    <groupId>io.quarkiverse</groupId>
+    <artifactId>quarkus-chicory</artifactId>
+    <version>{project-version}</version>
+</dependency>
+----
+
+[[extension-configuration-reference]]
+== Extension Configuration Reference
+
+include::includes/quarkus-chicory.adoc[leveloffset=+1, opts=optional]

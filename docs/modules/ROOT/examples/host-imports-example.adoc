@@ -1,0 +1,62 @@
+
+This example demonstrates how to provide Java functions that WebAssembly modules can call (host imports).
+
+==== Configuration
+
+Configure your WASM module in `application.properties`:
+
+[source,properties]
+----
+quarkus.chicory.modules.operation.name=io.quarkiverse.chicory.it.OperationModule
+quarkus.chicory.modules.operation.wasm-resource=operation.wasm
+----
+
+==== Java Implementation
+
+Inject the module and provide host functions that the WASM module can import:
+
+[source,java]
+----
+@Path("/chicory")
+@ApplicationScoped
+public class ChicoryResourceWithImports {
+
+    @Inject
+    @Named("operation")
+    WasmQuarkusContext wasmQuarkusContext;
+
+    Instance instance;
+
+    @PostConstruct
+    public void init() {
+        WasmModule wasmModule = wasmQuarkusContext.getWasmModule();
+
+        // Define a host function that WASM can call
+        HostFunction hostLog = new HostFunction(
+            "env",                                    // Module name
+            "host_log",                               // Function name
+            FunctionType.of(List.of(ValType.I32), List.of()),  // Signature: (i32) -> ()
+            (inst, args) -> {
+                int num = (int) args[0];
+                System.out.println("Called from WASM: " + num);
+                return null;
+            }
+        );
+
+        // Build instance with host imports
+        instance = Instance.builder(wasmModule)
+            .withImportValues(ImportValues.builder()
+                .addFunction(hostLog)
+                .build())
+            .withMachineFactory(wasmQuarkusContext.getMachineFactory())
+            .build();
+    }
+
+    @GET
+    public Response hello() {
+        // Call WASM function, which will call back to our host_log function
+        var result = instance.exports().function("operation").apply(41, 1);
+        return Response.ok("Result: " + result[0]).build();
+    }
+}
+----

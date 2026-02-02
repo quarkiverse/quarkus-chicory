@@ -1,0 +1,8 @@
+{
+  "kind": "Pod",
+  "spec": {
+    "containers": [
+      { "image": "registry.company.com/nginx:1.25" }
+    ]
+  }
+}

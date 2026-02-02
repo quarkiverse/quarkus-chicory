@@ -1,0 +1,110 @@
+
+This example demonstrates memory management patterns for passing complex data (strings, byte arrays) between Java and
+WebAssembly.
+
+==== Configuration
+
+[source,properties]
+----
+quarkus.chicory.modules.go-cel.name=io.quarkiverse.chicory.it.GoCelModule
+quarkus.chicory.modules.go-cel.wasm-file=${project.basedir}/src/main/resources/go-cel.wasm
+----
+
+==== WASM Module Requirements
+
+The WASM module must export memory management functions:
+
+* `malloc(size: i32) -> i32` - Allocate memory, returns pointer
+* `free(ptr: i32)` - Free allocated memory
+* `evalPolicy(policyPtr: i32, policyLen: i32, inputPtr: i32, inputLen: i32) -> i32` - Process data using pointer/length
+pairs
+
+==== Java Implementation
+
+Use the exported `malloc`/`free` functions and memory access:
+
+[source,java]
+----
+@Path("/policy")
+@ApplicationScoped
+public class PolicyResource {
+
+    @Inject
+    @Named("go-cel")
+    WasmQuarkusContext wasmQuarkusContext;
+
+    Instance instance;
+    ExportFunction malloc;
+    ExportFunction free;
+    ExportFunction evalPolicy;
+    Memory memory;
+
+    @PostConstruct
+    public void init() throws IOException {
+        WasmModule wasmModule = wasmQuarkusContext.getWasmModule();
+
+        // Configure WASI if needed
+        WasiPreview1 wasi = WasiPreview1.builder()
+            .withOptions(WasiOptions.builder().build())
+            .build();
+
+        Store store = new Store().addFunction(wasi.toHostFunctions());
+
+        instance = Instance.builder(wasmModule)
+            .withMachineFactory(wasmQuarkusContext.getMachineFactory())
+            .withImportValues(store.toImportValues())
+            .withStart(false)
+            .build();
+
+        // Export memory management functions
+        malloc = instance.export("malloc");
+        free = instance.export("free");
+        evalPolicy = instance.export("evalPolicy");
+        memory = instance.memory();
+
+        // Initialize Go runtime
+        try {
+            instance.export("_start").apply();
+        } catch (WasiExitException e) {
+            if (e.exitCode() != 0) throw new RuntimeException("Init failed");
+        }
+    }
+
+    @POST
+    public Response validate(String policy, String input) {
+        byte[] policyBytes = policy.getBytes(StandardCharsets.UTF_8);
+        byte[] inputBytes = input.getBytes(StandardCharsets.UTF_8);
+
+        // Step 1: Allocate memory in WASM
+        int policyPtr = (int) malloc.apply(policyBytes.length)[0];
+        int inputPtr = (int) malloc.apply(inputBytes.length)[0];
+
+        try {
+            // Step 2: Write data to WASM memory
+            memory.write(policyPtr, policyBytes);
+            memory.write(inputPtr, inputBytes);
+
+            // Step 3: Call WASM function with pointer/length pairs
+            long[] result = evalPolicy.apply(
+                policyPtr, policyBytes.length,
+                inputPtr, inputBytes.length
+            );
+
+            int returnCode = (int) result[0];
+
+            // Step 4: Interpret results
+            if (returnCode == 1) {
+                return Response.ok("Policy allows").build();
+            } else if (returnCode == 0) {
+                return Response.ok("Policy denies").build();
+            } else {
+                return Response.status(400).entity("Error: " + returnCode).build();
+            }
+        } finally {
+            // Step 5: Free allocated memory
+            free.apply(policyPtr);
+            free.apply(inputPtr);
+        }
+    }
+}
+----

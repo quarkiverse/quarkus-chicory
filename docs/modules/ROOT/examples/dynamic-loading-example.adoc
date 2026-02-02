@@ -1,0 +1,64 @@
+
+This example demonstrates how to load WebAssembly modules dynamically at runtime, useful for plugin systems,
+multi-tenant applications, or user-uploaded WASM modules.
+
+==== Configuration
+
+Configure a dynamic module without specifying the WASM payload in `application.properties`:
+
+[source,properties]
+----
+# Define the module but don't specify wasm-file or wasm-resource
+quarkus.chicory.modules.operation-dynamic.name=io.quarkiverse.chicory.it.DynamicOperationModule
+
+# The Wasm module payload will be provided at runtime
+----
+
+The key difference from static modules is the **absence of `wasm-file` or `wasm-resource`** properties. The extension
+creates the `WasmQuarkusContext` bean, but the actual WASM module is loaded later.
+
+==== Java Implementation
+
+[source,java]
+----
+@Path("/chicory/dynamic")
+@ApplicationScoped
+public class ChicoryDynamicResource {
+
+    @Inject
+    @Named("operation-dynamic")
+    WasmQuarkusContext wasmQuarkusContext;  // Injected but no WASM loaded yet
+
+    Instance instance;
+
+    @POST
+    @Path("/upload")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response upload(@RestForm("module") FileUpload wasmModule) throws IOException {
+        try (InputStream is = Files.newInputStream(wasmModule.uploadedFile())) {
+            // Parse the uploaded WASM file
+            WasmModule module = Parser.parse(is.readAllBytes());
+
+            // Create instance using the MachineFactory from WasmQuarkusContext
+            instance = Instance.builder(module)
+                .withMachineFactory(wasmQuarkusContext.getMachineFactory())  // Environment-optimized
+                .build();
+
+            return Response.ok("Module loaded successfully").build();
+        }
+    }
+
+    @GET
+    public Response execute() {
+        if (instance == null) {
+            return Response.status(405)
+                .entity("No module loaded. Upload one first via POST /upload")
+                .build();
+        }
+
+        // Call the exported function
+        var result = instance.export("operation").apply(41, 1);
+        return Response.ok("Result: " + result[0]).build();
+    }
+}
+----

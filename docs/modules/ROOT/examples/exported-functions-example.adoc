@@ -1,0 +1,95 @@
+
+This example demonstrates how to call functions exported by your WebAssembly modules.
+
+==== Configuration
+
+Configure your WASM module in `application.properties`:
+
+[source,properties]
+----
+quarkus.chicory.modules.calculator.name=io.quarkiverse.chicory.it.CalculatorModule
+quarkus.chicory.modules.calculator.wasm-file=${project.basedir}/src/main/resources/calculator.wasm
+----
+
+==== WASM Module Exports
+
+Your WebAssembly module exports functions that can be called from Java:
+
+[source,wat]
+----
+;; WebAssembly Text Format (WAT)
+(module
+  (func (export "add") (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.add)
+
+  (func (export "multiply") (param i32 i32) (result i32)
+    local.get 0
+    local.get 1
+    i32.mul)
+
+  (func (export "sqrt") (param f64) (result f64)
+    local.get 0
+    f64.sqrt)
+)
+----
+
+==== Java Implementation
+
+[source,java]
+----
+@Path("/calculator")
+@ApplicationScoped
+public class CalculatorResource {
+
+    @Inject
+    @Named("calculator")
+    WasmQuarkusContext wasmQuarkusContext;
+
+    Instance instance;
+
+    // Cache exported functions for better performance
+    ExportFunction addFunction;
+    ExportFunction multiplyFunction;
+    ExportFunction sqrtFunction;
+
+    @PostConstruct
+    public void init() {
+        instance = Instance.builder(wasmQuarkusContext.getWasmModule())
+            .withMachineFactory(wasmQuarkusContext.getMachineFactory())
+            .build();
+
+        // Export functions by name
+        addFunction = instance.export("add");
+        multiplyFunction = instance.export("multiply");
+        sqrtFunction = instance.export("sqrt");
+    }
+
+    @GET
+    @Path("/add/{a}/{b}")
+    public Response add(@PathParam("a") int a, @PathParam("b") int b) {
+        // Call exported function with parameters
+        long[] result = addFunction.apply(a, b);
+        return Response.ok(result[0]).build();
+    }
+
+    @GET
+    @Path("/multiply/{a}/{b}")
+    public Response multiply(@PathParam("a") int a, @PathParam("b") int b) {
+        long[] result = multiplyFunction.apply(a, b);
+        return Response.ok(result[0]).build();
+    }
+
+    @GET
+    @Path("/sqrt/{n}")
+    public Response sqrt(@PathParam("n") double n) {
+        // Use the alternative exports() API
+        var result = instance.exports()
+            .function("sqrt")
+            .apply(Value.fromDouble(n));
+
+        return Response.ok(result[0].asDouble()).build();
+    }
+}
+----

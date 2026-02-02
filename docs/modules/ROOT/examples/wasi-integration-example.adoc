@@ -1,0 +1,100 @@
+
+This example shows how to integrate WASI (WebAssembly System Interface) support for modules that need system access.
+
+==== Configuration
+
+Configure the module in `application.properties`:
+
+[source,properties]
+----
+quarkus.chicory.modules.qrcode.name=io.quarkiverse.chicory.it.QRCodeModule
+quarkus.chicory.modules.qrcode.wasm-file=${project.basedir}/src/main/resources/qr-generator.wasm
+----
+
+==== Java Implementation
+
+Integrate WASI with the Quarkus-provided `MachineFactory`:
+
+[source,java]
+----
+@Path("/qrcode")
+@ApplicationScoped
+public class QRCodeResource {
+
+    @Inject
+    @Named("qrcode")
+    WasmQuarkusContext wasmQuarkusContext;
+
+    Instance instance;
+    ExportFunction malloc;
+    ExportFunction free;
+    ExportFunction generateQR;
+    Memory memory;
+
+    @PostConstruct
+    public void init() throws IOException {
+        WasmModule wasmModule = wasmQuarkusContext.getWasmModule();
+
+        // Create WASI support
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        WasiOptions options = WasiOptions.builder()
+            .withStdout(stdout)
+            .withStderr(stderr)
+            .build();
+
+        WasiPreview1 wasi = WasiPreview1.builder()
+            .withOptions(options)
+            .build();
+
+        Store store = new Store().addFunction(wasi.toHostFunctions());
+
+        // Combine WASI with Quarkus MachineFactory
+        instance = Instance.builder(wasmModule)
+            .withMachineFactory(wasmQuarkusContext.getMachineFactory())  // Environment-optimized
+            .withImportValues(store.toImportValues())                     // WASI functions
+            .withStart(false)
+            .build();
+
+        // Get exported functions
+        malloc = instance.export("malloc");
+        free = instance.export("free");
+        generateQR = instance.export("generateQR");
+        memory = instance.memory();
+
+        // Initialize WASM module (if needed)
+        try {
+            instance.export("_start").apply();
+        } catch (WasiExitException e) {
+            if (e.exitCode() != 0) {
+                throw new RuntimeException("WASM initialization failed");
+            }
+        }
+    }
+
+    @GET
+    public Response generate(@QueryParam("text") String text) {
+        byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
+
+        // Allocate memory in WASM
+        int textPtr = (int) malloc.apply(textBytes.length)[0];
+
+        try {
+            // Write data to WASM memory
+            memory.write(textPtr, textBytes);
+
+            // Call exported function
+            long[] result = generateQR.apply(textPtr, textBytes.length);
+            int qrPtr = (int) result[0];
+
+            // Read result from WASM memory
+            byte[] qrCode = memory.readBytes(qrPtr, result[1]);
+
+            return Response.ok(qrCode).build();
+        } finally {
+            free.apply(textPtr);
+        }
+    }
+}
+----

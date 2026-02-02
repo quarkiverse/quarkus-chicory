@@ -1,0 +1,2 @@
+object.kind == "Pod" &&
+object.spec.containers.all(c, c.image.startsWith("registry.company.com/"))

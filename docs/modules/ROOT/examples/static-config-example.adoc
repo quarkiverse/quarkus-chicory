@@ -1,0 +1,50 @@
+
+This example demonstrates how to configure and use a static WebAssembly module loaded at build time.
+
+==== Configuration
+
+[source,properties]
+----
+quarkus.chicory.modules.operation-static.name=io.quarkiverse.chicory.it.OperationModule
+# The Wasm module payload is configurable either as a file
+##quarkus.chicory.modules.operation.wasm-file=src/main/resources/wasm/operation.wasm
+# Or as a classpath resource, but file the file based configuration takes precedence
+quarkus.chicory.modules.operation-static.wasm-resource=operation.wasm
+
+# Quarkus Chicory will watch all configured Wasm modules, so no need to add the following property:
+#quarkus.live-reload.watched-resources=wasm/operation.wasm
+----
+
+The `operation-static` identifier is the module name used for injection. The module is loaded as a classpath resource
+via `wasm-resource`, and the `name` property configures code generation.
+
+==== Java Implementation
+
+The above configuration will let your application inject a `WasmQuarkusContext` bean, like this:
+
+[source,java]
+----
+@Path("/chicory")
+@ApplicationScoped
+public class ChicoryResource {
+
+    @Inject
+    @Named("operation-static")
+    WasmQuarkusContext wasmQuarkusContext;
+
+    Instance instance;
+
+    @PostConstruct
+    public void init() {
+        instance = Instance.builder(wasmQuarkusContext.getWasmModule())
+            .withMachineFactory(wasmQuarkusContext.getMachineFactory())
+            .build();
+    }
+
+    @GET
+    public Response hello() {
+        var result = instance.export("operation").apply(41, 1);
+        return Response.ok("Hello chicory: " + result[0]).build();
+    }
+}
+----

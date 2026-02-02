@@ -1,0 +1,12 @@
+name: Chicory
+description: | 
+  A Quarkus extension for Chicory, that takes care of the plumbing behind the scenes so developers can just 
+  focus on their applications.
+metadata:
+  keywords:
+    - chicory
+    - wasm
+  guide: https://docs.quarkiverse.io/chicory/dev/ # To create and publish this guide, see https://github.com/quarkiverse/quarkiverse/wiki#documenting-your-extension
+  categories:
+    - "miscellaneous"
+  status: "preview"
