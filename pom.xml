@@ -9,7 +9,7 @@
     </parent>
     <groupId>io.quarkiverse.chicory</groupId>
     <artifactId>quarkus-chicory-parent</artifactId>
-    <version>0.0.1</version>
+    <version>999-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Quarkus Chicory - Parent</name>
 
@@ -22,7 +22,7 @@
         <connection>scm:git:git@github.com:quarkiverse/quarkus-chicory.git</connection>
         <developerConnection>scm:git:git@github.com:quarkiverse/quarkus-chicory.git</developerConnection>
         <url>https://github.com/quarkiverse/quarkus-chicory</url>
-      <tag>0.0.1</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <properties>
