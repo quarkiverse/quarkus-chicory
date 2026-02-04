@@ -203,7 +203,7 @@ For instance, with Maven, add the following dependency to your POM file:
 [source,xml,subs=attributes+]
 ----
 <dependency>
-    <groupId>io.quarkiverse</groupId>
+    <groupId>io.quarkiverse.chicory</groupId>
     <artifactId>quarkus-chicory</artifactId>
     <version>{project-version}</version>
 </dependency>

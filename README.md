@@ -29,7 +29,7 @@ Add the extension to your project:
 
 ```xml
 <dependency>
-    <groupId>io.quarkiverse</groupId>
+    <groupId>io.quarkiverse.chicory</groupId>
     <artifactId>quarkus-chicory</artifactId>
     <version>${quarkus-chicory.version}</version>
 </dependency>
