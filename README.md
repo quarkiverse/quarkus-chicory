@@ -1,6 +1,6 @@
 # Quarkus Chicory
 
-[![Version](https://img.shields.io/maven-central/v/io.quarkiverse/quarkus-chicory?logo=apache-maven&style=flat-square)](https://central.sonatype.com/artifact/io.quarkiverse/quarkus-chicory-parent)
+[![Version](https://img.shields.io/maven-central/v/io.quarkiverse.chicory/quarkus-chicory?logo=apache-maven&style=flat-square)](https://central.sonatype.com/artifact/io.quarkiverse.chicory/quarkus-chicory-parent)
 
 ## Overview
 
